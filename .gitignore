@@ -1,2 +1,4 @@
 .env
+oclif.manifest.json
+lib/
 node_modules/

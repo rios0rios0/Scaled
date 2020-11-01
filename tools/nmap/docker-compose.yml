@@ -5,14 +5,16 @@ services:
     environment:
       SERVICES: sqs
       AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - 9999:4576
 
   nmap:
       build: .
       environment:
-        CONTAINERS: "1:${CONTAINERS}"
-        TARGET: "scanme.nmap.org:${T}"
-        START_PORT: "100:${S}"
-        END_PORT: "200:${E}"
+        CONTAINERS: "${CONTAINERS:-1}"
+        TARGET: "${T:-scanme.nmap.org}"
+        START_PORT: "${S:-50}"
+        END_PORT: "${E:-200}"
         AWS_ACCESS_KEY_ID: any
         AWS_SECRET_ACCESS_KEY: any
         AWS_DEFAULT_REGION: us-east-1

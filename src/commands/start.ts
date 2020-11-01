@@ -1,13 +1,14 @@
-import { Command, flags } from '@oclif/command';
+import {Command, flags} from '@oclif/command';
 import * as Listr from 'listr';
 import * as execa from 'execa';
 import * as path from 'path';
-import { Observable } from 'rxjs';
+import {Observable} from 'rxjs';
 import * as fs from 'fs';
-import { ServiceDefinition } from '../types';
-import ManagerService from '../manager';
+import {ServiceDefinition} from '../types';
+import ServiceManager from '../manager';
 import Resolver from '../resolver';
-import { printServices } from '../helpers/display';
+import {printServices} from '../helpers/display';
+import {SQSHelper} from '../helpers/sqs';
 
 export default class Start extends Command {
   static description = 'start a service';
@@ -29,13 +30,13 @@ export default class Start extends Command {
     containers: flags.integer({
       description: 'number of containers to scale tool',
       required: false,
-      default: 1
+      default: 1,
     }),
     'set-env': flags.string({
       description: 'set environment variable on local shell',
       multiple: true,
       required: false,
-    })
+    }),
   };
 
   static examples = [
@@ -44,10 +45,10 @@ export default class Start extends Command {
 
   private resolver = new Resolver();
 
-  private manager = new ManagerService();
+  private manager = new ServiceManager();
 
   async run() {
-    const { args: { service: serviceName }, flags: startFlags } = this.parse(Start);
+    const {args: {service: serviceName}, flags: startFlags} = this.parse(Start);
 
     try {
       const service = await this.resolver.resolveService(serviceName);
@@ -64,17 +65,26 @@ export default class Start extends Command {
               .then(() => resolve.complete())
               .catch((e) => resolve.error(e));
           }),
-          enabled: () => this.isThereDotEnv(service)
+          enabled: () => this.isThereDotEnv(service),
         },
         {
           title: 'Setting environment variables',
           task: () => new Observable((resolve) => resolve.complete()),
-          enabled: () => startFlags['set-env']?.length > 0
+          enabled: () => startFlags['set-env']?.length > 0,
         },
         {
           title: `Starting service '${service?.name}'`,
           task: () => new Observable((resolve) => {
             this.manager.start(service, startFlags,
+              (message) => resolve.next(message))
+              .then(() => resolve.complete())
+              .catch((e) => resolve.error(e));
+          }),
+        },
+        {
+          title: 'Getting report result',
+          task: () => new Observable((resolve) => {
+            this.manager.report(service, startFlags.containers,
               (message) => resolve.next(message))
               .then(() => resolve.complete())
               .catch((e) => resolve.error(e));
