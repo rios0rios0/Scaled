@@ -1,17 +1,20 @@
 version: "3.8"
 services:
-  aws:
+  sqs:
     image: localstack/localstack:0.11.4
     environment:
       SERVICES: sqs
       AWS_DEFAULT_REGION: us-east-1
 
-  silent:
+  nmap:
       build: .
       environment:
-        TARGET: "${TARGET}"
+        CONTAINERS: "1:${CONTAINERS}"
+        TARGET: "scanme.nmap.org:${T}"
+        START_PORT: "100:${S}"
+        END_PORT: "200:${E}"
         AWS_ACCESS_KEY_ID: any
         AWS_SECRET_ACCESS_KEY: any
         AWS_DEFAULT_REGION: us-east-1
       depends_on:
-        - aws
+        - sqs
