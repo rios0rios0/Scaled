@@ -3,6 +3,18 @@ export type ServiceDefinition = {
   path: string;
 };
 
+export type NMAPService = {
+  '$': {
+    name: string,
+    product: string,
+    version?: string,
+    extrainfo: string,
+    method: string,
+    conf: string
+  },
+  cpe?: [string]
+};
+
 export type NMAPReport = {
   nmaprun: {
     '$': {
@@ -28,10 +40,7 @@ export type NMAPReport = {
       status: [{ '$': { state: string, reason: string, reason_ttl: string } }],
       address: [{ '$': { addr: string, addrtype: string } }],
       hostnames: [{
-        hostname: [
-          { '$': { name: string, type: string } },
-          { '$': { name: string, type: string } }
-        ]
+        hostname: [{ '$': { name: string, type: string } }]
       }],
       ports: [{
         extraports: [{
@@ -40,20 +49,8 @@ export type NMAPReport = {
         }],
         port: [{
           '$': { protocol: string, portid: string },
-          state: [{
-            '$': { state: string, reason: string, reason_ttl: string }
-          }],
-          service: [{
-            '$': {
-              name: string,
-              product: string,
-              version: string,
-              extrainfo: string,
-              method: string,
-              conf: string
-            },
-            cpe: [string]
-          }]
+          state: [{ '$': { state: string, reason: string, reason_ttl: string } }],
+          service?: [NMAPService]
         }]
       }],
       times: [{ '$': { srtt: string, rttvar: string, to: string } }]

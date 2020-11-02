@@ -8,7 +8,6 @@ import {ServiceDefinition} from '../types';
 import ServiceManager from '../manager';
 import Resolver from '../resolver';
 import {printServices} from '../helpers/display';
-import {SQSHelper} from '../helpers/sqs';
 
 export default class Start extends Command {
   static description = 'start a service';
@@ -48,9 +47,15 @@ export default class Start extends Command {
   private manager = new ServiceManager();
 
   async run() {
+    process.on('SIGINT', () => {
+      console.log("Caught interrupt signal");
+      process.exit();
+    });
+
     const {args: {service: serviceName}, flags: startFlags} = this.parse(Start);
 
     try {
+      let finalReport: string = '';
       const service = await this.resolver.resolveService(serviceName);
 
       if (!service) {
@@ -86,15 +91,19 @@ export default class Start extends Command {
           task: () => new Observable((resolve) => {
             this.manager.report(service, startFlags.containers,
               (message) => resolve.next(message))
-              .then(() => resolve.complete())
+              .then((report) => {
+                finalReport = report;
+                resolve.complete();
+              })
               .catch((e) => resolve.error(e));
+
           }),
         },
       ]);
 
       await tasks.run();
 
-      printServices([service]);
+      printServices(service, JSON.parse(finalReport));
     } catch (e) {
       this.error(e.message);
     }

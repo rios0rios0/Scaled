@@ -1,8 +1,9 @@
 import * as path from 'path';
 import * as execa from 'execa';
-import {NMAPReport, ServiceDefinition} from '../types';
+import {ServiceDefinition} from '../types';
 import {SQSHelper} from '../helpers/sqs';
-import {parseStringPromise as parser} from 'xml2js';
+import {NMAPReportService} from '../infrastructure/services/nmap-report-service';
+
 
 type Flags = {
   build: boolean,
@@ -47,28 +48,17 @@ export default class ServiceManager {
     service: ServiceDefinition,
     totalContainers: number,
     onUpdate: (message: string) => void,
-  ): Promise<void> {
+  ): Promise<string> {
     const queue = 'reports';
     const sqs = new SQSHelper();
-    onUpdate(`Waiting for SQS queue '${queue}'...`);
-    await sqs.waitForQueue(queue);
-    onUpdate(`Waiting termination of '${service.name}' containers...`);
-    await this.waitForTermination(service, totalContainers, onUpdate);
-    onUpdate('Iterating all resolved reports...');
+    //onUpdate(`Waiting for SQS queue '${queue}'...`);
+    //await sqs.waitForQueue(queue);
+    //onUpdate(`Waiting termination of '${service.name}' containers...`);
+    //await this.waitForTermination(service, totalContainers, onUpdate);
+    //onUpdate('Iterating all resolved reports...');
 
     const base64Messages = await sqs.receiveAllMessages(`${queue}`);
-    if (base64Messages.length > 0) {
-      let reports: NMAPReport[] = [];
-      const decoded = base64Messages.map((message) => message.decode());
-      await decoded.map(async (message) => reports.push(await parser(message)));
-      reports.map((report) => {
-        const {service} = report.nmaprun.host[0].ports[0].port[0];
-        const {protocol, portid} = report.nmaprun.host[0].ports[0].port[0].$;
-        onUpdate(protocol);
-        onUpdate(portid);
-        onUpdate(`${protocol}:${portid}-${service[0].cpe}`);
-      });
-    }
+    return NMAPReportService.toReadable(base64Messages);
   }
 
   private async waitForTermination(
@@ -76,23 +66,18 @@ export default class ServiceManager {
     totalContainers: number,
     onUpdate: (message: string) => void,
   ): Promise<void> {
-    const args = [
-      ...this.globalArgs(service),
-      'images',
-    ];
-
     return await new Promise(resolve => {
       const interval = setInterval(async () => {
 
-        const subprocess = await execa('docker-compose', args);
-        const containers = subprocess.stdout.split('\n').filter((line: string) => {
+        const subprocess = await execa('docker', ['ps']);
+        const runningContainers = subprocess.stdout.split('\n').filter((line: string) => {
           return line.includes(`${service.name}_${service.name}`);
         });
 
-        const done = containers.length;
+        const done = totalContainers - runningContainers.length;
         onUpdate(`Waiting termination of '${service.name}' containers [${done}/${totalContainers}]...`);
 
-        if (done === 0) {
+        if (done === totalContainers) {
           resolve();
           clearInterval(interval);
         }
