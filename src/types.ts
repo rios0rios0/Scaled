@@ -35,7 +35,7 @@ export type NMAPReport = {
     }],
     verbose: [{ '$': { level: string } }],
     debugging: [{ '$': { level: string } }],
-    host: [{
+    host?: [{
       '$': { starttime: string, endtime: string },
       status: [{ '$': { state: string, reason: string, reason_ttl: string } }],
       address: [{ '$': { addr: string, addrtype: string } }],

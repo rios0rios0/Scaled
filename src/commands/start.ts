@@ -47,10 +47,7 @@ export default class Start extends Command {
   private manager = new ServiceManager();
 
   async run() {
-    process.on('SIGINT', () => {
-      console.log("Caught interrupt signal");
-      process.exit();
-    });
+
 
     const {args: {service: serviceName}, flags: startFlags} = this.parse(Start);
 
@@ -61,6 +58,12 @@ export default class Start extends Command {
       if (!service) {
         this.error(`Service '${serviceName}' not found.`);
       }
+
+      process.on('SIGINT', async () => {
+        //this.error('Removing containers gracefully...');
+        await this.manager.stop(service!);
+        process.exit();
+      });
 
       const tasks = new Listr([
         {
@@ -93,17 +96,23 @@ export default class Start extends Command {
               (message) => resolve.next(message))
               .then((report) => {
                 finalReport = report;
-                resolve.complete();
+
               })
               .catch((e) => resolve.error(e));
-
+            resolve.complete();
           }),
         },
+        /*{
+          title: 'Removing all containers...',
+          task: () =>new Observable((resolve) => {
+            this.manager.stop(service).then(() => resolve.complete()).catch((e) => resolve.error(e));
+          }),
+        }*/
       ]);
 
       await tasks.run();
 
-      printServices(service, JSON.parse(finalReport));
+      printServices(service, JSON.parse('{}'));
     } catch (e) {
       this.error(e.message);
     }

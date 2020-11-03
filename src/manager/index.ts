@@ -4,11 +4,10 @@ import {ServiceDefinition} from '../types';
 import {SQSHelper} from '../helpers/sqs';
 import {NMAPReportService} from '../infrastructure/services/nmap-report-service';
 
-
 type Flags = {
-  build: boolean,
-  containers: number,
-  'set-env': string[]
+  build?: boolean,
+  containers?: number,
+  'set-env'?: string[]
 }
 
 export default class ServiceManager {
@@ -31,17 +30,25 @@ export default class ServiceManager {
       },
     };
 
-    if (flags['set-env'].length > 0) flags['set-env'].map((value) => {
+    if (flags['set-env'] && flags['set-env']?.length > 0) flags['set-env'].map((value) => {
       Object.assign(opts.env, {[value.split('=')[0]]: value.split('=')[1]});
     });
 
     if (flags.build) args.push('--build', '--always-recreate-deps');
-    if (flags.containers > 1) args.push('--scale', `${service.name}=${flags.containers}`);
+    if (flags.containers && flags.containers > 1) args.push('--scale', `${service.name}=${flags.containers}`);
 
     const subprocess = execa('docker-compose', args, {...opts});
     subprocess.stdout.on('data', (data) => onUpdate(data.toString()));
 
     await subprocess;
+  }
+
+  async stop(service: ServiceDefinition): Promise<void> {
+    await execa('docker-compose', [
+      ...this.globalArgs(service),
+      'down',
+      '--remove-orphans',
+    ]);
   }
 
   async report(
@@ -51,12 +58,11 @@ export default class ServiceManager {
   ): Promise<string> {
     const queue = 'reports';
     const sqs = new SQSHelper();
-    //onUpdate(`Waiting for SQS queue '${queue}'...`);
-    //await sqs.waitForQueue(queue);
-    //onUpdate(`Waiting termination of '${service.name}' containers...`);
-    //await this.waitForTermination(service, totalContainers, onUpdate);
-    //onUpdate('Iterating all resolved reports...');
-
+    onUpdate(`Waiting for SQS queue '${queue}'...`);
+    await sqs.waitForQueue(queue);
+    onUpdate(`Waiting termination of '${service.name}' containers...`);
+    await this.waitForTermination(service, totalContainers, onUpdate);
+    onUpdate('Iterating all resolved reports...');
     const base64Messages = await sqs.receiveAllMessages(`${queue}`);
     return NMAPReportService.toReadable(base64Messages);
   }

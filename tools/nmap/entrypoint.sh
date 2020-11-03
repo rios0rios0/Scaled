@@ -20,24 +20,48 @@ start_wait_tor () {
 calculate_targets () {
   echo "Calculating the targets to insert on SQS..."
 
-  PORTS=`expr "$END_PORT" - "$START_PORT"`
+  PORTS=`expr "$END_PORT" - "$START_PORT" + 1`
 
-  if [ `echo "$PORTS % $CONTAINERS" | bc` -gt 0 ]; then
-      $CONTAINERS=$PORTS
+  if [ $CONTAINERS -gt $PORTS ]; then
+      CONTAINERS=$PORTS
   fi
 
   reazon=`echo "$PORTS / $CONTAINERS" | bc`
+  remain=`echo "$PORTS % $CONTAINERS" | bc`
 
-  i=$START_PORT
-  while [  $i -lt $END_PORT ]; do
-      list=$(seq -s , $i `expr "$i" + "$reazon" - 1`)
+  targets_file='targets.json'
+  echo '[' > $targets_file
+  count=$START_PORT
+  while [  $count -le $END_PORT ]; do
+      start=$count
+      end=`expr $count + $reazon - 1`
+      if [ $end -gt $END_PORT ]; then
+        end=$END_PORT
+      fi
 
-      aws --endpoint-url=http://sqs:4576 sqs send-message \
-          --queue-url http://sqs:4576/000000000000/targets \
-          --message-body "$list" >> $AWS_LOG
+      if [ $remain -gt 0 ]; then
+        end=$(( end+1 ))
+        remain=$(( remain-1 ))
+        count=$(( count+1 ))
+      fi
 
-      i=$(( i+$reazon ))
+      count=$(( count+$reazon )) #TODO: don't use count after here
+
+
+      separator=''
+      if [ $count -lt $END_PORT ]; then
+        separator=','
+      fi
+
+      range="$start-$end"
+      echo "{ \"Id\": \"$range\"," >> $targets_file
+      echo "\"MessageBody\": \"$range\" }$separator" >> $targets_file
   done
+  echo ']' >> $targets_file
+
+  aws --endpoint-url=http://sqs:4576 sqs send-message-batch \
+      --queue-url http://sqs:4576/000000000000/targets \
+      --entries file://$targets_file >> $AWS_LOG
 }
 
 create_sqs_targets_endpoint () {
@@ -69,7 +93,14 @@ create_sqs_reports_endpoint
 create_sqs_targets_endpoint
 
 echo "Starting NMAP scan with Proxychains..."
-ports=$(aws --endpoint-url=http://sqs:4576 sqs receive-message --queue-url http://sqs:4576/000000000000/targets | jq .Messages[0].Body | tr -d \")
+message=$(aws --endpoint-url=http://sqs:4576 sqs receive-message --queue-url http://sqs:4576/000000000000/targets)
+handle=$(echo $message | jq .Messages[0].ReceiptHandle | tr -d \")
+ports=$(echo $message | jq .Messages[0].Body | tr -d \")
+aws --endpoint-url=http://sqs:4576 sqs delete-message \
+    --queue-url http://sqs:4576/000000000000/targets \
+    --receipt-handle $handle >> $AWS_LOG
+
+echo "proxychains -q nmap -PN -sTV --open -p $ports -oX - $TARGET > report.xml"
 proxychains -q nmap -PN -sTV --open -p $ports -oX - $TARGET > report.xml
 
 echo "Posting report result to SQS..."
