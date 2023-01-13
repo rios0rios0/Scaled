@@ -61,7 +61,7 @@
     "marked-terminal": "^4.1.0",
     "rxjs": "^6.5.5",
     "sudo-prompt": "^9.2.1",
-    "terminal-kit": "^1.35.3",
+    "terminal-kit": "^2.1.8",
     "tslib": "^1",
     "xml2js": "^0.4.23",
     "yaml": "^1.10.0"
