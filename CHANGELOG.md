@@ -22,6 +22,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-06
+
+### Security
+
+- closed the two remaining Dependabot alerts that its grouped `npm_and_yarn` security update could not fix by itself -- both packages are transitive, so the updater bailed with `NoChangeError` rather than touch a manifest it had no entry for. `serialize-javascript` carried GHSA-qj8w-gfj5-8c6v (CPU-exhaustion denial of service via crafted array-like objects, fixed in 7.0.5) and reaches the tree through `mocha`, which asks for `^6.0.2`; the `resolutions` floor that already overrides that request moved from `^7.0.3` to `^7.0.5`, which resolves to 7.1.1. `uuid` carried GHSA-w5hq-g745-h8pq (missing buffer bounds check in v3/v5/v6 when `buf` is provided, patched only in 11.1.1) and reached the tree solely through `nyc@14`, which imports it as `require('uuid/v4')` -- a deep path uuid removed in v7, so a `resolutions` entry forcing 11.1.1 would have left the coverage runner unable to load. `nyc` moved to 18.0.0 instead, which dropped the `uuid` dependency outright and takes the package out of the tree entirely. No advisory was suppressed and no direct dependency was upgraded beyond the one that pinned the vulnerable version.
+
 ## [0.4.0] - 2026-08-28
 
 ### Added
