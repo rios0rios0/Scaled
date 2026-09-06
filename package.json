@@ -83,13 +83,13 @@
     "eslint-config-airbnb-typescript": "^8.0.2",
     "eslint-plugin-import": "^2.20.2",
     "mocha": "^11.7.5",
-    "nyc": "^14",
+    "nyc": "^18",
     "ts-node": "^8",
     "typescript": "^5.9.3"
   },
   "resolutions": {
     "tmp": "^0.2.4",
-    "serialize-javascript": "^7.0.3",
+    "serialize-javascript": "^7.0.5",
     "cross-spawn": "^7.0.6",
     "flatted": "^3.4.0"
   }
